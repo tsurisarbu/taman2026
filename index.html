@@ -475,7 +475,6 @@ function showYearScreen() {
     const cnt = recs.reduce((s,r) => s+r.count, 0);
     return `<button class="year-btn" onclick="selectYear('${y}')">
       <span>${y}年 大会</span>
-      <span class="yr-count">登録 ${cnt} 匹</span>
     </button>`;
   }).join('');
 }

@@ -214,11 +214,19 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Hiragino San
       <div id="s2" style="display:none">
         <div class="card">
           <div class="card-title">検量シートの写真（1枚）</div>
-          <div class="upload-zone" id="sheet-zone" onclick="document.getElementById('sheet-inp').click()">
-            <input type="file" id="sheet-inp" accept="image/*" capture="environment" style="display:none" onchange="onSheet(event)">
+          <input type="file" id="sheet-inp" accept="image/*" style="display:none" onchange="onSheet(event)">
+          <input type="file" id="sheet-inp-cam" accept="image/*" capture="environment" style="display:none" onchange="onSheet(event)">
+          <div class="upload-zone" id="sheet-zone" style="cursor:default">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            <div class="upload-text" id="sheet-txt">タップして撮影・選択</div>
-            <div class="upload-sub">1枚のみ</div>
+            <div class="upload-text" id="sheet-txt">検量シートを追加</div>
+            <div style="display:flex;gap:8px;margin-top:12px;justify-content:center">
+              <button type="button" class="btn" style="flex:1;font-size:14px;padding:10px 8px" onclick="document.getElementById('sheet-inp-cam').click()">
+                📷 撮影する
+              </button>
+              <button type="button" class="btn" style="flex:1;font-size:14px;padding:10px 8px" onclick="document.getElementById('sheet-inp').click()">
+                🖼 写真を選ぶ
+              </button>
+            </div>
           </div>
           <div id="sheet-prev" style="display:none;margin-top:10px;text-align:center"></div>
         </div>
@@ -737,6 +745,7 @@ function submitRecord() {
 function resetForm() {
   sheetFile = null; sheetURL = null; fishCount = 0; fishData = [];
   document.getElementById('sheet-inp').value = '';
+  document.getElementById('sheet-inp-cam').value = '';
   document.getElementById('fish-count-inp').value = '';
   document.getElementById('sheet-zone').classList.remove('has');
   document.getElementById('sheet-txt').textContent = 'タップして撮影・選択';

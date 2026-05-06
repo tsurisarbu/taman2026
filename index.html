@@ -245,9 +245,13 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Hiragino San
 
       <div id="s3" style="display:none">
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div class="card-title" style="margin-bottom:0">魚を1匹ずつ登録</div>
             <span class="badge" id="fish-badge">0 / 0</span>
+          </div>
+          <div style="background:#E6F1FB;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:#0C447C;font-weight:500">総重量合計</span>
+            <span style="font-size:20px;font-weight:700;color:#185FA5" id="total-weight-display">0 <span style="font-size:13px;font-weight:400">g</span></span>
           </div>
           <div id="fish-entries"></div>
         </div>
@@ -287,6 +291,14 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Hiragino San
         <div style="display:flex;gap:10px">
           <button class="btn" onclick="goStep(3)" style="flex:1">← 戻る</button>
           <button class="btn btn-success btn-full" onclick="submitRecord()" style="flex:2;font-size:16px">✓ この内容で登録する</button>
+        </div>
+      </div>
+
+      <!-- 自分の登録一覧（エリアアカウント用） -->
+      <div id="my-records-section" style="display:none;margin-top:8px">
+        <div class="card">
+          <div class="card-title">自分の登録一覧</div>
+          <div id="my-records-list"></div>
         </div>
       </div>
     </div>
@@ -396,8 +408,16 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Hiragino San
 <div id="toast"></div>
 
 <script>
+const ACCOUNTS = {
+  'taman':      {role:'guest',    area:null},
+  'okinawa123': {role:'area',     area:'沖縄本島'},
+  'miyako123':  {role:'area',     area:'宮古島'},
+  'ishigaki123':{role:'area',     area:'石垣島'},
+  'taman70':    {role:'admin',    area:null},
+};
 const APP_PW = 'taman';
 const ADMIN_PW = 'taman70';
+let currentUser = null; // {role, area, pw}
 const AREA_CLASS = {'沖縄本島':'atag-ok','宮古島':'atag-mi','石垣島':'atag-is'};
 const AREA_COLORS = {'沖縄本島':'#185FA5','宮古島':'#0F6E56','石垣島':'#993C1D'};
 const PIE_COLORS = ['#185FA5','#0F6E56','#993C1D','#993556','#854F0B','#3B6D11','#1D9E75','#D85A30'];
@@ -433,8 +453,10 @@ let isAdmin = false;
 
 // ---- アプリロック ----
 function checkAppPw() {
-  const v = document.getElementById('app-pw').value;
-  if (v === APP_PW) {
+  const v = document.getElementById('app-pw').value.trim();
+  const acc = ACCOUNTS[v];
+  if (acc) {
+    currentUser = {role: acc.role, area: acc.area, pw: v};
     document.getElementById('lock-screen').style.display = 'none';
     showYearScreen();
   } else {
@@ -484,10 +506,29 @@ function selectYear(y) {
   records = loadRecords(y);
   document.getElementById('year-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'flex';
-  // Update header to show year
+  const roleLabel = currentUser.role === 'admin' ? '管理者' : currentUser.role === 'area' ? currentUser.area : '閲覧';
   document.querySelector('.header-logo').innerHTML = `
     <svg viewBox="0 0 24 24" style="width:22px;height:22px;flex-shrink:0"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-    タマンオールスター戦 <span style="font-size:13px;font-weight:400;color:var(--text2)">${y}年</span>`;
+    タマンオールスター戦 <span style="font-size:12px;font-weight:400;color:var(--text2)">${y}年 · ${roleLabel}</span>`;
+  // Admin: show admin bar and logout
+  if (currentUser.role === 'admin') {
+    isAdmin = true;
+    document.getElementById('admin-bar').style.display = 'flex';
+    document.getElementById('admin-logout-btn').style.display = 'block';
+    // Unlock ranking/stats tabs
+    ['rank','stats'].forEach(p => {
+      document.getElementById(p+'-lock').style.display = 'none';
+      document.getElementById(p+'-content').style.display = 'block';
+    });
+  }
+  // Area account: auto-set area and hide area selector
+  if (currentUser.role === 'area') {
+    curArea = currentUser.area;
+  }
+  // Guest: hide record tab (read-only)
+  if (currentUser.role === 'guest') {
+    document.getElementById('tab-record').style.display = 'none';
+  }
   initApp();
 }
 
@@ -500,9 +541,24 @@ function addYear() {
 }
 
 function initApp() {
+  // For area accounts, pre-select and lock the area segment
+  if (currentUser && currentUser.role === 'area') {
+    const areaSeg = document.getElementById('seg-area');
+    if (areaSeg) {
+      areaSeg.querySelectorAll('.seg-btn').forEach(b => {
+        b.classList.remove('active');
+        if (b.textContent.trim() === currentUser.area) b.classList.add('active');
+        b.disabled = true;
+        b.style.opacity = b.textContent.trim() === currentUser.area ? '1' : '0.35';
+        b.style.cursor = 'default';
+      });
+    }
+    curArea = currentUser.area;
+  }
   updateAnglerSeg();
   renderStepbar();
   renderMembers();
+  renderMyRecords();
 }
 
 // ---- 管理者ロック ----
@@ -529,6 +585,8 @@ function checkAdmin(page) {
 
 function adminLogout() {
   isAdmin = false;
+  currentUser = null;
+  records = [];
   document.getElementById('admin-bar').style.display = 'none';
   document.getElementById('admin-logout-btn').style.display = 'none';
   ['rank','stats'].forEach(p => {
@@ -537,7 +595,11 @@ function adminLogout() {
     document.getElementById('pw-'+p).value = '';
     document.getElementById('pw-'+p+'-err').textContent = '';
   });
-  showPage('record', document.getElementById('tab-record'));
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('lock-screen').style.display = 'flex';
+  document.getElementById('app-pw').value = '';
+  document.getElementById('app-pw-err').textContent = '';
+  document.getElementById('tab-record').style.display = '';
   toast('ログアウトしました');
 }
 
@@ -699,6 +761,9 @@ function updateFishBadge() {
   } else {
     msg.innerHTML = '';
   }
+  const totalW = fishData.reduce((s, f) => s + (parseFloat(f.weight) || 0), 0);
+  const el = document.getElementById('total-weight-display');
+  if (el) el.innerHTML = totalW.toLocaleString() + ' <span style="font-size:13px;font-weight:400">g</span>';
 }
 
 function checkS3() {
@@ -733,7 +798,8 @@ function submitRecord() {
   records.push({
     id: Date.now(), angler: curAngler, team: m.team, area: curArea,
     count: fishCount, totalWeight: totalW, maxLength: maxL,
-    date, sheetURL, fishData: JSON.parse(JSON.stringify(fishData))
+    date, sheetURL, fishData: JSON.parse(JSON.stringify(fishData)),
+    createdBy: currentUser ? currentUser.pw : 'guest'
   });
   saveRecords(currentYear, records);
   toast('✓ 登録しました（' + curAngler + ' / ' + fishCount + '匹）');
@@ -784,9 +850,13 @@ function renderRanking() {
   tbody.innerHTML = sorted.map((a, i) => {
     const bc = i===0?'rb1':i===1?'rb2':i===2?'rb3':'rbn';
     const val = rankBy === 'weight' ? a.totalW.toLocaleString() + ' g' : a.maxL.toFixed(1) + ' cm';
+    // Admin can delete all records; area account can delete own area records
+    const canDelete = currentUser && (currentUser.role === 'admin' ||
+      (currentUser.role === 'area' && currentUser.area === a.area));
+    const delBtn = canDelete ? `<button onclick="deleteAngler('${a.angler}')" style="font-size:11px;padding:4px 8px;background:var(--red-light);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-top:4px;display:block">削除</button>` : '';
     return `<tr>
       <td><span class="rank-badge ${bc}">${i+1}</span></td>
-      <td style="font-weight:600;font-size:13px">${a.angler}<br><span style="font-size:11px;color:var(--text2);font-weight:400">${a.team||'—'}</span></td>
+      <td style="font-weight:600;font-size:13px">${a.angler}<br><span style="font-size:11px;color:var(--text2);font-weight:400">${a.team||'—'}</span>${delBtn}</td>
       <td><span class="atag ${AREA_CLASS[a.area]}">${a.area}</span></td>
       <td style="font-weight:700">${val}</td>
     </tr>`;
@@ -794,6 +864,17 @@ function renderRanking() {
 }
 
 // ---- 統計（円グラフ） ----
+function deleteAngler(anglerName) {
+  if (!confirm(anglerName + ' の全記録を削除しますか？')) return;
+  const canDelete = currentUser && (currentUser.role === 'admin' ||
+    (currentUser.role === 'area' && records.filter(r=>r.angler===anglerName).every(r=>r.area===currentUser.area)));
+  if (!canDelete) { toast('この記録を削除する権限がありません'); return; }
+  records = records.filter(r => r.angler !== anglerName);
+  saveRecords(currentYear, records);
+  renderRanking();
+  toast('削除しました');
+}
+
 function renderStats() {
   const total = records.reduce((s,r) => s+r.count, 0);
   const totalW = records.reduce((s,r) => s+r.totalWeight, 0);
@@ -850,6 +931,46 @@ function drawPie(canvasId, entries, legendId, colors) {
 }
 
 // ---- 参加者 ----
+function renderMyRecords() {
+  const sec = document.getElementById('my-records-section');
+  const list = document.getElementById('my-records-list');
+  if (!sec || !list) return;
+  if (!currentUser || currentUser.role === 'guest') { sec.style.display='none'; return; }
+  sec.style.display = 'block';
+  // For area accounts: show records for their area. For admin: show all.
+  const myRecs = currentUser.role === 'admin'
+    ? records
+    : records.filter(r => r.area === currentUser.area);
+  if (!myRecs.length) {
+    list.innerHTML = '<div class="empty" style="padding:16px">まだ登録がありません</div>';
+    return;
+  }
+  list.innerHTML = myRecs.map(r => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border)">
+      <div>
+        <div style="font-weight:600;font-size:14px">${r.angler}</div>
+        <div style="font-size:12px;color:var(--text2)">${r.date} · ${r.count}匹 · ${r.totalWeight.toLocaleString()}g</div>
+      </div>
+      <button onclick="deleteRecord(${r.id})" style="font-size:12px;padding:6px 10px;background:var(--red-light);color:var(--red);border:1px solid var(--red);border-radius:8px;cursor:pointer;flex-shrink:0">削除</button>
+    </div>`).join('');
+}
+
+function deleteRecord(id) {
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+  // Check permission
+  const canDelete = currentUser && (
+    currentUser.role === 'admin' ||
+    (currentUser.role === 'area' && rec.area === currentUser.area)
+  );
+  if (!canDelete) { toast('この記録を削除する権限がありません'); return; }
+  if (!confirm('この記録を削除しますか？')) return;
+  records = records.filter(r => r.id !== id);
+  saveRecords(currentYear, records);
+  renderMyRecords();
+  toast('削除しました');
+}
+
 function renderMembers() {
   document.getElementById('members-tbody').innerHTML = MEMBERS.map(m =>
     `<tr>
